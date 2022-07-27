@@ -24,6 +24,7 @@ type SearchResult struct {
 func SelectFromDBbySexAndAge(tgID string, ud UserData) []SearchResult {
 
 	var query string
+	var queries []string
 
 	if ud.PartnersSex == "не важно" && ud.PartnersAge == "не важно" {
 
@@ -31,52 +32,77 @@ func SelectFromDBbySexAndAge(tgID string, ud UserData) []SearchResult {
 		where (a.PartnersSex = 'не важно' or a.PartnersSex = '%s') and 
 		(a.PartnersAge = 'не важно' or a.PartnersAge like '%%%s%%')`, tgID, ud.Sex, ud.Age)
 
+		queries = append(queries, query)
+
 	} else if ud.PartnersSex == "не важно" && ud.PartnersAge != "не важно" {
 
-		query = fmt.Sprintf(`select * from (select * from (select * from users where tgID != '%s') a 
-		where (a.PartnersSex = 'не важно' or a.PartnersSex = '%s') and 
-		(a.PartnersAge = 'не важно' or a.PartnersAge like '%%%s%%')) b
-		where b.Age like '%%%s%%'`, tgID, ud.Sex, ud.Age, ud.PartnersAge)
+		ages := strings.Split(ud.PartnersAge, ", ")
+
+		for _, age := range ages {
+
+			query = fmt.Sprintf(`select * from (select * from (select * from users where tgID != '%s') a 
+			where (a.PartnersSex = 'не важно' or a.PartnersSex = '%s') and 
+			(a.PartnersAge = 'не важно' or a.PartnersAge like '%%%s%%')) b
+			where b.age = '%s'`, tgID, ud.Sex, ud.Age, age)
+
+			queries = append(queries, query)
+		}
 
 	} else if ud.PartnersSex != "не важно" && ud.PartnersAge == "не важно" {
 
 		query = fmt.Sprintf(`select * from (select * from (select * from users where tgID != '%s') a 
 		where (a.PartnersSex = 'не важно' or a.PartnersSex = '%s') and 
 		(a.PartnersAge = 'не важно' or a.PartnersAge like '%%%s%%')) b
-		where b.Sex = '%s'`, tgID, ud.Sex, ud.Age, ud.PartnersSex)
+		where b.sex = '%s'`, tgID, ud.Sex, ud.Age, ud.PartnersSex)
+
+		queries = append(queries, query)
 
 	} else if ud.PartnersSex != "не важно" && ud.PartnersAge != "не важно" {
 
-		query = fmt.Sprintf(`select * from (select * from (select * from users where tgID != '%s') a 
+		ages := strings.Split(ud.PartnersAge, ", ")
+
+		for _, age := range ages {
+
+			query = fmt.Sprintf(`select * from (select * from (select * from users where tgID != '%s') a 
 		where (a.PartnersSex = 'не важно' or a.PartnersSex = '%s') and 
 		(a.PartnersAge = 'не важно' or a.PartnersAge like '%%%s%%')) b
-		where b.sex = '%s' and b.age like '%%%s%%'`, tgID, ud.Sex, ud.Age, ud.PartnersSex, ud.PartnersAge)
+		where b.sex = '%s' and b.age = '%s'`, tgID, ud.Sex, ud.Age, ud.PartnersSex, age)
+
+			queries = append(queries, query)
+		}
 	}
 
-	rows, err := Db.Query(query)
+	return SelectFromDB(queries)
+}
 
-	if err != nil {
-		log.Printf("Error during search query (%s): %v", query, err)
-	}
-	defer rows.Close()
+func SelectFromDB(queries []string) []SearchResult {
 
-	found := make([]SearchResult, 0)
+	var found []SearchResult
 
-	for rows.Next() {
+	for _, query := range queries {
 
-		var sr SearchResult
+		rows, err := Db.Query(query)
 
-		if err := rows.Scan(&sr.TgID, &sr.Age, &sr.Sex, &sr.Interests, &sr.Location); err != nil {
-			log.Printf("Error in scan during search query (%s): %v", query, err)
+		if err != nil {
+			log.Printf("Error during search query (%s): %v", query, err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+
+			var sr SearchResult
+
+			if err := rows.Scan(&sr.TgID, &sr.Age, &sr.Sex, &sr.Interests, &sr.Location); err != nil {
+				log.Printf("Error in scan during search query (%s): %v", query, err)
+			}
+
+			found = append(found, sr)
 		}
 
-		found = append(found, sr)
+		if err := rows.Err(); err != nil {
+			log.Printf("Error in scan during search query (%s): %v", query, err)
+		}
 	}
-
-	if err := rows.Err(); err != nil {
-		log.Printf("Error in scan during search query (%s): %v", query, err)
-	}
-
 	return found
 }
 
