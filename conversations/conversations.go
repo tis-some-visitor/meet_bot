@@ -64,7 +64,7 @@ func NewCycleUpdates(update tgbotapi.Update) {
 
 			if userProfile > 0 {
 				state, messageNO := dbfellow.GetUserState(tgID)
-				newUserStateHandler(update, state, messageNO, tgID)
+				UserStateHandler(update, state, messageNO, tgID)
 
 			} else {
 				Start(chatID, ID, messageID, firstName, tgID)

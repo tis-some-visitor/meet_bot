@@ -9,7 +9,7 @@ import (
 )
 
 //handling of user input according to the current user state
-func newUserStateHandler(update tgbotapi.Update, state string, keyboardMesNO int, tgID string) {
+func UserStateHandler(update tgbotapi.Update, state string, keyboardMesNO int, tgID string) {
 
 	switch state {
 
